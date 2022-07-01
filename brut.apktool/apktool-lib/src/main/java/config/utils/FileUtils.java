@@ -7,15 +7,14 @@ import java.util.List;
 
 public class FileUtils {
 
-    public static List<File> fileList = new ArrayList();
-    public static List<File> getFileList(File dir) {
+    public static List<File> getFileList(File dir,List<File> fileList) {
+
         File[] files = dir.listFiles(); // 该文件目录下文件全部放入数组
         if (files != null) {
             for (int i = 0; i < files.length; i++) {
                 if (files[i].isDirectory()) { // 判断是文件还是文件夹
-                    getFileList(files[i]); // 获取文件绝对路径
-                } else  { // 判断文件名
-                    String strFileName = files[i].getAbsolutePath();
+                    getFileList(files[i],fileList); // 获取文件绝对路径
+                } else  {
                     fileList.add(files[i]);
                 }
             }

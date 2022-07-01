@@ -347,7 +347,7 @@ public class XmlUtils {
         try {
             DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
 
-            System.out.println("mergingXml: outXmlFileName: " + outXmlFileName + " ; inXmlFileName: " + inXmlFileName);
+       //     System.out.println("mergingXml: outXmlFileName: " + outXmlFileName + " ; inXmlFileName: " + inXmlFileName);
 
             DocumentBuilder db = dbf.newDocumentBuilder();
 

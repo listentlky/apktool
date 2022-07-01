@@ -21,6 +21,8 @@ import javax.xml.transform.dom.DOMSource;
 import javax.xml.transform.stream.StreamResult;
 import java.io.*;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 
 public class QuickConfig {
@@ -81,18 +83,21 @@ public class QuickConfig {
      *
      * @param appDir
      * @param metaInfo
-     * @param replaceApkDir
      * @param quick
      */
-    public void updateQuickConfigInfo(ExtFile appDir, MetaInfo metaInfo, File replaceApkDir, String quick) {
+    public void updateQuickConfigInfo(ExtFile appDir, MetaInfo metaInfo, String quick) {
+        if (getCurrentQuickInfo() == null) {
+            return;
+        }
+
         // 更新版本号 yml文件
         updateMeta(metaInfo);
         // 更新合并渠道配置清单
         updateAndroidManifest(appDir, quick);
         // 更新合并代码和资源文件
-        //  updateSmaliAndRes(appDir, replaceApkDir, quick);
+        updateSmaliAndRes(appDir, quick);
 
-        updateSmailAndRes2(appDir, quick);
+        //  updateSmailAndRes2(appDir, quick);
 
     }
 
@@ -103,12 +108,13 @@ public class QuickConfig {
      * @param appDir
      */
     private void updateAndroidManifest(ExtFile appDir, String quick) {
-        if (quickConfigModel == null) {
+        if (currentQuickInfo == null) {
             return;
         }
+
         File updateAndroidManifest = new File(appDir, "AndroidManifest.xml");
 
-        System.out.println("updateAndroidManifest.getName(): " + updateAndroidManifest.getPath() + " ; quick: " + quick);
+    //    System.out.println("updateAndroidManifest.getName(): " + updateAndroidManifest.getPath() + " ; quick: " + quick);
 
         MergeDom4jUtil.mergeAndroidManifestXml(updateAndroidManifest.getPath(), quick);
 
@@ -127,35 +133,38 @@ public class QuickConfig {
 
             //读取原包包名
             String oldPackage = rootElement.getAttributes().getNamedItem("package").getNodeValue();
-            System.out.println("oldPackage: " + oldPackage);
+            System.out.println("原包名: " + oldPackage);
 
-            if (currentQuickInfo != null) {
-                //读取icon
-                String icon = rootElement.getElementsByTagName("application").item(0).getAttributes().getNamedItem("android:icon").getNodeValue();
-                currentQuickInfo.setReplaceIconType(icon.split("/")[0].split("@")[1]);
-                currentQuickInfo.setReplaceIconName(icon.split("/")[1]);
-                System.out.println("currentQuickInfo ReplaceIconType: " + currentQuickInfo.getReplaceIconType());
-                System.out.println("currentQuickInfo ReplaceIconName: " + currentQuickInfo.getReplaceIconName());
-            }
+            //读取icon
+            String icon = rootElement.getElementsByTagName("application").item(0).getAttributes().getNamedItem("android:icon").getNodeValue();
+            currentQuickInfo.setReplaceIconType(icon.split("/")[0].split("@")[1]);
+            currentQuickInfo.setReplaceIconName(icon.split("/")[1]);
+            System.out.println("icon类型: " + currentQuickInfo.getReplaceIconType());
+            System.out.println("icon名称: " + currentQuickInfo.getReplaceIconName());
 
             String newPackage = null;
 
-            List<String> currentManifest = new ArrayList<>();
+            List<String> currentManifest = currentQuickInfo.getAndroidManifest();
 
-            for (QuickInfoModel quickInfoModel : quickConfigModel.getQuick().getInfo()) {
+/*            for (QuickInfoModel quickInfoModel : quickConfigModel.getQuick().getInfo()) {
                 if (quick.equals(quickInfoModel.getSdk())) {
                     currentManifest.addAll(quickInfoModel.getAndroidManifest());
                 }
-            }
+            }*/
 
             for (String updateInfo : currentManifest) {
                 if (updateInfo.contains("package")) {
                     newPackage = updateInfo.split("=")[2];
                 }
             }
-            System.out.println("newPackage: " + newPackage);
-            QuickConfig.getInstance().getCurrentQuickInfo().setPackageName(newPackage);
 
+            if(!TextUtils.isEmpty(newPackage)){
+                System.out.println("新包名: " + newPackage);
+                currentQuickInfo.setPackageName(newPackage);
+            }else {
+                System.out.println("未配置包名 沿用原包");
+                currentQuickInfo.setPackageName(oldPackage);
+            }
             for (String updateInfo : currentManifest) {
                 if (TextUtils.isEmpty(updateInfo)) {
                     continue;
@@ -209,12 +218,21 @@ public class QuickConfig {
         if (quickConfigModel == null || currentQuickInfo == null || currentQuickInfo.getApktool() == null) {
             return;
         }
+        try {
+            currentQuickInfo.setTargetSdkVersion(Integer.valueOf(meta.sdkInfo.get("targetSdkVersion")));
+        }catch (Exception e){
+
+        }
         ApktoolModel apktool = currentQuickInfo.getApktool();
         if (!TextUtils.isEmpty(apktool.getVersionCode())) {
             meta.versionInfo.versionCode = apktool.getVersionCode();
+        } else {
+            apktool.setVersionCode(meta.versionInfo.versionCode);
         }
         if (!TextUtils.isEmpty(apktool.getVersionName())) {
             meta.versionInfo.versionName = apktool.getVersionName();
+        } else {
+            apktool.setVersionName(meta.versionInfo.versionName);
         }
         if (!TextUtils.isEmpty(apktool.getMinSdkVersion())) {
             meta.sdkInfo.put("minSdkVersion", apktool.getMinSdkVersion());
@@ -225,7 +243,7 @@ public class QuickConfig {
     }
 
     public static void main(String args[]) {
-     //   updateSmailAndRes2(new ExtFile("E:/devcopy/xipusdkDemo-release"), "xipu");
+        //   updateSmailAndRes2(new ExtFile("E:/devcopy/xipusdkDemo-release"), "xipu");
 
         File dirs = new File("E:\\devcopy\\hcdemo_vivo-release\\res\\values-watch-v20\\dimens.xml");
 
@@ -234,72 +252,83 @@ public class QuickConfig {
 
     }
 
+    public static HashMap<String, String> currentReplaceSmaliMap = new HashMap<>();
 
-    public static void updateSmailAndRes2(ExtFile appDir, String quick) {
+
+    public static void updateSmaliAndRes(ExtFile appDir, String quick) {
+        currentReplaceSmaliMap.clear();
         try {
-
+            System.out.println("开始删除所有渠道相同smali文件");
             /**
-             * 非目标渠道先删
+             * 1.删除其他渠道smali文件
+             * 2.删除匹配渠道相同文件并保存路径
              */
             for (QuickInfoModel quickInfoModel : QuickConfig.getInstance().getQuickModel().getQuick().getInfo()) {
-                if (!quickInfoModel.getSdk().equals(quick)) {// 非目标渠道删除
-                    File quickFile = new File(quickInfoModel.getApkpath().replace(".apk", ""));
-                    FileUtils.fileList.clear();
-                    List<File> allQuickFileList = FileUtils.getFileList(quickFile);
-                    int outSmaliDirCount = FileUtils.smailCount(appDir);
-                    for (File path : allQuickFileList) {
+                File quickFile = new File(quickInfoModel.getApkpath().replace(".apk", ""));
 
-                        if (path.getPath().contains("AndroidManifest.xml") || path.getPath().contains("apktool.yml")) {
-                            continue;
-                        }
+                List<File> oneQuickFileList = FileUtils.getFileList(quickFile,new ArrayList<>());
 
+                int outSmaliDirCount = FileUtils.smailCount(appDir);
 
-                        //       System.out.println("获取所有文件: " + path);
+                for (File path : oneQuickFileList) {
 
-                        String[] split = path.getPath().split(quickFile.getName());
+                    System.out.println("quick: "+quickInfoModel.getSdk()+" ; "+path);
 
-                        if (path.getPath().contains("smali")) {
-                            String smaliPath;
-                            String[] split1 = split[1].split("\\\\");
-                            String endPath = "";
-                            for (int i = 2; i < split1.length; i++) {
-                                endPath += split1[i];
-                                if (i < split1.length - 1) {
-                                    endPath += "\\";
-                                }
+                    if (path.getPath().contains("AndroidManifest.xml") || path.getPath().contains("apktool.yml")) {
+                        continue;
+                    }
+
+                    String[] split = path.getPath().split(quickFile.getName());
+
+                    if (path.getPath().contains("smali")) {
+                        String smaliPath;
+                        String[] split1 = split[1].split("\\\\");
+                        String endPath = "";
+                        for (int i = 2; i < split1.length; i++) {
+                            endPath += split1[i];
+                            if (i < split1.length - 1) {
+                                endPath += "\\";
                             }
-                            //       System.out.println("endPath: " + endPath);
-                            for (int i = 0; i < outSmaliDirCount; i++) { // 目标生成的smali 个数
-                                smaliPath = i == 0 ? appDir + "\\smali\\" + endPath : appDir + "\\smali_classes" + (i + 1) + "\\" + endPath;
+                        }
+                        for (int i = 0; i < outSmaliDirCount; i++) { // 目标生成的smali 个数
+                            smaliPath = i == 0 ? appDir + "\\smali\\" + endPath : appDir + "\\smali_classes" + (i + 1) + "\\" + endPath;
 
-                                File file = new File(smaliPath);
-                                //     System.out.println("不同渠道遍历smail目录path是否存在: " + file.exists());
-                                if (file.exists()) {
-                                    File parentFile = file.getParentFile();
-                                    for (File file1 : parentFile.listFiles()) {
-                                        file1.delete();
+                            File file = new File(smaliPath);
+                            if (file.exists()) {
+                                if (quickInfoModel.getSdk().equals(quick)) {
+                                    if(file.getAbsolutePath().contains("com\\tencent\\bugly")){
+                                        System.out.println("腾讯bugly "+file.getPath());
                                     }
-                                }
-                            }
 
+                                    currentReplaceSmaliMap.put(endPath.replace(file.getName(),""), file.getPath());
+                                }
+                                file.delete();
+                            }
                         }
+
                     }
                 }
             }
 
+         /*   Iterator<String> iterator10 = currentReplaceSmaliMap.keySet().iterator();
+            while (iterator10.hasNext()) {
+                String next = iterator10.next();
+                System.out.println("删除的相同文件 "+next +" ; path: "+currentReplaceSmaliMap.get(next));
+            }*/
+
             //删除所有空文件下
             FileUtils.removeNullFile(appDir);
 
+            System.out.println("开始复制 "+quick+" 渠道文件");
             /**
              * 目标渠道添加
              */
             for (QuickInfoModel quickInfoModel : QuickConfig.getInstance().getQuickModel().getQuick().getInfo()) {
                 if (quickInfoModel.getSdk().equals(quick)) {
                     File quickFile = new File(quickInfoModel.getApkpath().replace(".apk", ""));
-                    FileUtils.fileList.clear();
-                    List<File> allQuickFileList = FileUtils.getFileList(quickFile);
+                    List<File> oneQuickFileList = FileUtils.getFileList(quickFile,new ArrayList<>());
                     int outSmaliDirCount = FileUtils.smailCount(appDir);
-                    for (File path : allQuickFileList) {
+                    for (File path : oneQuickFileList) {
 
                         if (path.getPath().contains("AndroidManifest.xml") || path.getPath().contains("apktool.yml")) {
                             continue;
@@ -308,7 +337,6 @@ public class QuickConfig {
                         //       System.out.println("获取所有文件: " + path);
 
                         String[] split = path.getPath().split(quickFile.getName());
-
                         File outFilePath = new File(appDir, split[1]);
 
                         if (path.getPath().contains("smali")) {
@@ -322,39 +350,50 @@ public class QuickConfig {
                                     endPath += "\\";
                                 }
                             }
-                            String outSmaliName = "";
-
-
-                            if (smaliName.equals("smali")) {
-                                outSmaliName = outSmaliDirCount <= 0 ? "smali" : "smali_classes" + (outSmaliDirCount + 1);
-                            } else {
-                                int smali_classesCount = Integer.valueOf(smaliName.replace("smali_classes", ""));
-                                outSmaliName = "smali_classes" + (outSmaliDirCount + smali_classesCount);
+                            File outFile = null;
+                            Iterator<String> iterator = currentReplaceSmaliMap.keySet().iterator();
+                            boolean isFind = false;
+                            while (iterator.hasNext()) {
+                                String next = iterator.next();
+                                if (endPath.contains(next)) {
+                                    isFind = true;
+                                    outFile = new File(currentReplaceSmaliMap.get(next));
+                                }
+                            }
+                            if(endPath.contains("com\\tencent\\bugly")){
+                                System.out.println("222222222222腾讯bugly "+endPath);
                             }
 
-                            File outFile = new File(appDir, outSmaliName + "\\" + endPath);
-
-                            //       System.out.println("copy smali  in: "+path+" ; out: " + outFile.getPath());
+                            if (!isFind) {
+                                String outSmaliName = "";
+                                if (smaliName.equals("smali")) {
+                                    outSmaliName = outSmaliDirCount <= 0 ? "smali" : "smali_classes" + (outSmaliDirCount + 1);
+                                } else {
+                                    int smali_classesCount = Integer.valueOf(smaliName.replace("smali_classes", ""));
+                                    outSmaliName = "smali_classes" + (outSmaliDirCount + smali_classesCount);
+                                }
+                                outFile = new File(appDir, outSmaliName + "\\" + endPath);
+                            }
 
                             FileUtils.mkdirParentFile(outFile);
 
                             try {
                                 BrutIO.copyAndClose(new FileInputStream(path), new FileOutputStream(outFile));
-                            }catch (Exception e) {
+                            } catch (Exception e) {
                                 System.out.println("copy 出错: Exception " + e);
                             }
 
-                        }else if (path.getPath().contains("values")) {
+                        } else if (path.getPath().contains("values")) {
 
                             FileUtils.mkdirParentFile(outFilePath);
 
-                            if(!outFilePath.exists()){
+                            if (!outFilePath.exists()) {
                                 try {
                                     BrutIO.copyAndClose(new FileInputStream(path), new FileOutputStream(outFilePath));
-                                }catch (Exception e) {
+                                } catch (Exception e) {
                                     System.out.println("copy 出错: Exception " + e);
                                 }
-                            }else {
+                            } else {
                                 if (path.getPath().endsWith("public.xml")) {
                                     MergeDom4jUtil.mergePublicXml(outFilePath.getPath(), path.getPath());
                                 } else {
@@ -370,7 +409,7 @@ public class QuickConfig {
                             FileUtils.mkdirParentFile(outFilePath);
                             try {
                                 BrutIO.copyAndClose(new FileInputStream(path), new FileOutputStream(outFilePath));
-                            }catch (Exception e) {
+                            } catch (Exception e) {
                                 System.out.println("copy 出错: Exception " + e);
                             }
                         }
@@ -381,14 +420,15 @@ public class QuickConfig {
             /**
              * 删除icon
              */
-            if (QuickConfig.getInstance().getCurrentQuickInfo().getRes().getIcon().size() > 0) {
+            if (currentQuickInfo.getRes().getIcon().size() > 0) {
+                System.out.println("删除icon");
                 List<String> copyIconName = new ArrayList<>();
                 File file = new File(appDir, "res");
                 for (File file1 : file.listFiles()) {
 
-                    if (file1.getName().contains(QuickConfig.getInstance().getCurrentQuickInfo().getReplaceIconType())) {
+                    if (file1.getName().contains(currentQuickInfo.getReplaceIconType())) {
                         for (File file2 : file1.listFiles()) {
-                            if (file2.getName().contains(QuickConfig.getInstance().getCurrentQuickInfo().getReplaceIconName()) &&
+                            if (file2.getName().contains(currentQuickInfo.getReplaceIconName()) &&
                                 !file2.getPath().endsWith("xml")) {
                                 copyIconName.add(file2.getName());
                                 file2.delete();
@@ -401,11 +441,12 @@ public class QuickConfig {
                  * 放置目标icon
                  */
 
-                for (String replaceIcon : QuickConfig.getInstance().getCurrentQuickInfo().getRes().getIcon()) {
+                for (String replaceIcon : currentQuickInfo.getRes().getIcon()) {
+                    System.out.println("放置icon");
                     String[] split = replaceIcon.split("=");
                     for (String iconName : copyIconName) {
                         try {
-                            BrutIO.copyAndClose(new FileInputStream(split[1]), new FileOutputStream(appDir.getPath() + "/res/" + QuickConfig.getInstance().getCurrentQuickInfo().getReplaceIconType() + "-" + split[0] + "/" + iconName));
+                            BrutIO.copyAndClose(new FileInputStream(split[1]), new FileOutputStream(appDir.getPath() + "/res/" + currentQuickInfo.getReplaceIconType() + "-" + split[0] + "/" + iconName));
                         } catch (Exception e) {
                             System.out.println("copy 出错: Exception " + e);
                         }
@@ -414,13 +455,13 @@ public class QuickConfig {
             }
 
         } catch (Exception e) {
-            System.out.println("报错啦：" + e);
+            System.out.println("updateSmailAndRes 报错啦：" + e);
         }
 
     }
 
 
-    private void updateSmaliAndRes(ExtFile appDir, File replaceApkDir, String quick) {
+    private void updateSmaliAndRes2(ExtFile appDir, File replaceApkDir, String quick) {
 
         List<ReplaceResModel> resModelList = ResManager.getInstance().getResModelList();
         System.out.println("updateSmali：" + resModelList.size() + " ; quick: " + quick + " ; " + appDir);

@@ -285,17 +285,17 @@ public class Androlib {
         }
     }
 
-    public void build(File appDir, File outFile, String quick, File replaceApkDir) throws BrutException {
-        build(new ExtFile(appDir), outFile, quick, replaceApkDir);
+    public void build(File appDir, File outFile, String quick) throws BrutException {
+        build(new ExtFile(appDir), outFile, quick);
     }
 
-    public void build(ExtFile appDir, File outFile, String quick, File replaceApkDir)
+    public void build(ExtFile appDir, File outFile, String quick)
         throws BrutException {
         LOGGER.info("Using Apktool " + Androlib.getVersion());
         MetaInfo meta = readMetaFile(appDir);
 
         // 更新渠道配置信息
-        QuickConfig.getInstance().updateQuickConfigInfo(appDir, meta, replaceApkDir, quick);
+        QuickConfig.getInstance().updateQuickConfigInfo(appDir, meta, quick);
 
         buildOptions.isFramework = meta.isFrameworkApk;
         buildOptions.resourcesAreCompressed = meta.compressionType;
@@ -357,28 +357,143 @@ public class Androlib {
     }
 
     private void signApk(File outFile) {
-        System.out.println("开始签名: " + outFile);
+        System.out.println("start sign apk: " + outFile);
 
         QuickInfoModel currentQuickInfo = QuickConfig.getInstance().getCurrentQuickInfo();
 
+        String signVersionPath = currentQuickInfo.getSignVersionPath();
+        String signDisk = null;
+
+        if (!TextUtils.isEmpty(signVersionPath) && signVersionPath.contains(":")) {
+            signDisk = signVersionPath.split(":")[0];
+        }
+
         KeyStoreModel keystore = currentQuickInfo.getKeystore();
 
-        String signCMD = "jarsigner -verbose -sigalg SHA1withRSA -digestalg SHA1 -sigalg MD5withRSA -keystore " + keystore.getPath() + " -signedjar " +
-            outFile.getPath().replace(outFile.getName(), currentQuickInfo.getSdk() + "_" + currentQuickInfo.getPackageName() + "_" + currentQuickInfo.getApktool().getVersionName()
-                + "_" + DateUtils.stampToDate(System.currentTimeMillis()) + "_sign.apk") + " " + outFile + " " + keystore.getAlias();
+        String signOutPath;
+
+        String signV1CMD = null,signV2CMD = null,zipalignCMD = null;
+
+        if(currentQuickInfo.getTargetSdkVersion()>=30){
+            signOutPath = outFile.getAbsolutePath();
+            zipalignCMD = "zipalign -v 4 "+signOutPath+" "+signOutPath.replace(".apk","_zipalign.apk");
+            signV2CMD = "apksigner sign --ks "+keystore.getPath()+" --ks-key-alias "+keystore.getAlias()+" " + outFile.getAbsolutePath().replace(".apk","_zipalign.apk");
+        }else {
+            String outPath = outFile.getAbsolutePath().replace(outFile.getName(), currentQuickInfo.getSdk() + "_" + currentQuickInfo.getPackageName() + "_" + currentQuickInfo.getApktool().getVersionName()
+                + "_" + DateUtils.stampToDate(System.currentTimeMillis()) + "_sign.apk");
+            signV1CMD = "jarsigner -verbose -sigalg SHA1withRSA -digestalg SHA1 -sigalg MD5withRSA -keystore " + keystore.getPath() + " -signedjar " +
+                outPath+" " + outFile.getAbsolutePath() + " " + keystore.getAlias();
+        }
 
         try {
             Process process = Runtime.getRuntime().exec("cmd");
 
+            String finalSignDisk = signDisk;
+            String finalSignV1CMD = signV1CMD;
+            String finalZipalignCMD = zipalignCMD;
             new Thread() {
                 public void run() {
                     try {
                         BufferedWriter bw = new BufferedWriter(new OutputStreamWriter(process.getOutputStream(), "GBK"));
 
-                        bw.write(signCMD);
-                        bw.newLine();
+                        if(currentQuickInfo.getTargetSdkVersion()>=30){ //V2签名前 先zipalign对齐
+                            if (!TextUtils.isEmpty(finalSignDisk)) {
+                                bw.write(finalSignDisk + ":");
+                                bw.newLine();
+                            }
 
-                        bw.write(keystore.getPassword());
+                            if (!TextUtils.isEmpty(signVersionPath)) {
+                                bw.write("cd " + signVersionPath);
+                                bw.newLine();
+                            }
+                            bw.write(finalZipalignCMD);
+                            bw.newLine();
+                        }else {
+
+                            bw.write(finalSignV1CMD);
+                            bw.newLine();
+
+                            bw.write(keystore.getPassword());
+                            bw.newLine();
+                        }
+                        bw.flush();
+                    } catch (IOException e) {
+                        // TODO Auto-generated catch block
+                        e.printStackTrace();
+                    }
+                }
+            }.start();
+
+            String finalSignV2CMD = signV2CMD;
+            new Thread() {
+                @Override
+                public void run() {
+
+                    try {
+                        BufferedReader br = new BufferedReader(new InputStreamReader(process.getInputStream(), "GBK"));
+
+                        String cmdout;
+                        while ((cmdout = br.readLine()) != null) {
+                            System.out.println(cmdout);
+
+                            if (cmdout.contains("已签名")) {
+                                process.destroy();
+                            } else if (cmdout.contains("Verification succesful")) {
+                                new Thread(new Runnable() {
+                                    @Override
+                                    public void run() {
+                                        try {
+                                            BufferedWriter bw = new BufferedWriter(new OutputStreamWriter(process.getOutputStream(), "GBK"));
+
+                                            bw.write(finalSignV2CMD);
+                                            bw.newLine();
+
+                                            bw.write(keystore.getPassword());
+                                            bw.newLine();
+
+                                            bw.flush();
+                                        }catch (Exception e){
+
+                                        }                                   }
+                                }).start();
+                            }else {
+
+                            }
+                        }
+                    } catch (IOException e) {
+
+                        e.printStackTrace();
+                    }
+                }
+            }.start();
+
+        } catch (IOException e) {
+            System.out.println("签名出错：" + e);
+            throw new RuntimeException(e);
+        }
+
+    }
+
+    private static void zipalignApk(File outFile, String signDisk, String signVersionPath) {
+
+        try {
+            Process process = Runtime.getRuntime().exec("cmd");
+            new Thread() {
+                public void run() {
+                    try {
+                        BufferedWriter bw = new BufferedWriter(new OutputStreamWriter(process.getOutputStream(), "GBK"));
+
+                        if (!TextUtils.isEmpty(signDisk)) {
+                            bw.write(signDisk + ":");
+                            bw.newLine();
+                        }
+
+                        if (!TextUtils.isEmpty(signVersionPath)) {
+                            bw.write("cd " + signVersionPath);
+                            bw.newLine();
+                        }
+
+                        bw.write("zipalign -v 4 " + outFile.getAbsolutePath() + " " + outFile.getAbsolutePath().replace(".apk", "_zipalign.apk"));
                         bw.newLine();
 
                         bw.flush();
@@ -396,11 +511,11 @@ public class Androlib {
                     try {
                         BufferedReader br = new BufferedReader(new InputStreamReader(process.getInputStream(), "GBK"));
 
-                        String cmdout = null;
+                        String cmdout;
                         while ((cmdout = br.readLine()) != null) {
                             System.out.println(cmdout);
 
-                            if (cmdout.contains("已签名")) {
+                            if (cmdout.contains("succesful")) {
                                 process.destroy();
                             }
                         }
@@ -412,10 +527,9 @@ public class Androlib {
             }.start();
 
         } catch (IOException e) {
-            System.out.println("签名出错：" + e);
+            System.out.println("zipalign 出错：" + e);
             throw new RuntimeException(e);
         }
-
     }
 
     public static void getJavaVersion() {
@@ -438,31 +552,29 @@ public class Androlib {
         //     getJavaVersion();
 
         String cmd = "jarsigner -verbose -sigalg SHA1withRSA -digestalg SHA1 -sigalg MD5withRSA -keystore " + "F:\\gemjy.keystore" + " -signedjar " +
-            "11111_sign.apk " + "E:\\devcopy\\hcdemo_vivo-release\\dist\\xiaomi_hcdemo_vivo-release.apk gemjycn";
+            "C:\\Users\\user\\AppData\\Local\\Android\\Sdk\\build-tools\\29.0.1\\xp_dny_fbsy_20220701.apk " + "C:\\Users\\user\\AppData\\Local\\Android\\Sdk\\build-tools\\29.0.1\\xp_dny_fbsy_20220701.apk gemjycn";
 
         //   System.out.println("打印： "+cmd);
 
         try {
             Process process = Runtime.getRuntime().exec("cmd");
-
+            BufferedWriter bw;
             new Thread() {
                 public void run() {
                     try {
                         BufferedWriter bw = new BufferedWriter(new OutputStreamWriter(process.getOutputStream(), "GBK"));
-                        bw.write("e:");
+                        bw.write("c:");
                         bw.newLine();
 
-                        bw.write("cd E:\\devcopy");
+                        bw.write("cd C:\\Users\\user\\AppData\\Local\\Android\\Sdk\\build-tools\\29.0.1");
                         bw.newLine();//因为读取时是一行行读取的，不加newline无法继续往下读
 
                         bw.write(cmd);
                         bw.newLine();
 
-                        bw.write("gemjy");
+                        bw.write("gemjy!cn");
                         bw.newLine();
-                  /*  bw.write("print tr");
-                    bw.newLine();
-*/
+
                         bw.flush();
                     } catch (IOException e) {
                         // TODO Auto-generated catch block
@@ -482,6 +594,35 @@ public class Androlib {
                         while ((cmdout = br.readLine()) != null) {
                             System.out.println("我是获取输出：" + cmdout);
                             if (cmdout.contains("jar 已签名")) {
+                                System.out.println("开始zip对齐：");
+                                //     zipalignApk(new File("C:\\Users\\user\\AppData\\Local\\Android\\Sdk\\build-tools\\29.0.1\\xp_dny_fbsy_20220701.apk"),"C","C:\\Users\\user\\AppData\\Local\\Android\\Sdk\\build-tools\\29.0.1");
+
+                               new Thread(new Runnable() {
+                                   @Override
+                                   public void run() {
+                                      try {
+                                          BufferedWriter bw = new BufferedWriter(new OutputStreamWriter(process.getOutputStream(), "GBK"));
+
+                                          /*  if(!TextUtils.isEmpty(finalSignDisk)){
+                                                bw.write(finalSignDisk +":");
+                                                bw.newLine();
+                                            }
+
+                                            if(!TextUtils.isEmpty(signVersionPath)){
+                                                bw.write("cd "+signVersionPath);
+                                                bw.newLine();
+                                            }*/
+
+                                          bw.write("zipalign -v 4 C:\\Users\\user\\AppData\\Local\\Android\\Sdk\\build-tools\\29.0.1\\xp_dny_fbsy_20220701.apk C:\\Users\\user\\AppData\\Local\\Android\\Sdk\\build-tools\\29.0.1\\xp_dny_fbsy_20220701_zipalign.apk");
+                                          bw.newLine();
+
+                                          bw.flush();
+                                      }catch (Exception e){
+
+
+                                      }                                   }
+                               }).start();
+                            } else if (cmdout.contains("Verification succesful")) {
                                 process.destroy();
                             }
                         }
@@ -497,6 +638,7 @@ public class Androlib {
             throw new RuntimeException(e);
         }
     }
+
 
     private void buildManifestFile(File appDir, File manifest, File manifestOriginal)
         throws AndrolibException {

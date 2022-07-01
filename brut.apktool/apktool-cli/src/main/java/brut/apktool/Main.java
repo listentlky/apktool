@@ -233,14 +233,8 @@ public class Main {
                     if (QuickConfig.getInstance().getQuickModel() != null
                         && QuickConfig.getInstance().getQuickModel().getQuick() != null) {
 
-                        System.out.println("读取所有渠道资源");
-                      /*  for (QuickInfoModel quickInfoModel : QuickConfig.getInstance().getQuickModel().getQuick().getInfo()) {
-
-                            ResManager.getInstance().readQuickRes(quickInfoModel);
-                        }*/
-
                         for (String quick : QuickConfig.getInstance().getQuickModel().getQuick().getOut()) {
-                            System.out.println("build 执行:"+quick);
+                            System.out.println("当前渠道: "+quick);
 
                             for (QuickInfoModel quickInfoModel : QuickConfig.getInstance().getQuickModel().getQuick().getInfo()) {
                                 if (quick.equals(quickInfoModel.getSdk())) {
@@ -250,7 +244,7 @@ public class Main {
                             }
 
                             try {
-                                new Androlib(new BuildOptions()).build(outDir, null, quick,decodeApkFileModel.getApkOutDir());
+                                new Androlib(new BuildOptions()).build(outDir, null, quick);
                             } catch (Exception e) {
                                 System.out.println("build 执行 Exception:"+e);
                             }
@@ -321,7 +315,7 @@ public class Main {
                 buildOptions.aaptVersion = AaptManager.getAaptVersion(cli.getOptionValue("a"));
             }
             System.out.println("");
-            new Androlib(buildOptions).build(new File(appDirName), outFile,null,null);
+            new Androlib(buildOptions).build(new File(appDirName), outFile,null);
         } catch (BrutException ex) {
             System.err.println(ex.getMessage());
             System.exit(1);

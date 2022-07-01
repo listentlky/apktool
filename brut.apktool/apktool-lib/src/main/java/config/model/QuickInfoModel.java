@@ -9,6 +9,8 @@ public class QuickInfoModel implements Serializable {
 
     private String apkpath;
 
+    private String signVersionPath;
+
     private List<String> androidManifest;
 
     private ApktoolModel apktool;
@@ -22,6 +24,8 @@ public class QuickInfoModel implements Serializable {
     private String replaceIconName;
 
     private String packageName;
+
+    private int targetSdkVersion;
 
     public String getSdk() {
         return sdk;
@@ -37,6 +41,14 @@ public class QuickInfoModel implements Serializable {
 
     public void setApkpath(String apkpath) {
         this.apkpath = apkpath;
+    }
+
+    public String getSignVersionPath() {
+        return signVersionPath;
+    }
+
+    public void setSignVersionPath(String signVersionPath) {
+        this.signVersionPath = signVersionPath;
     }
 
     public List<String> getAndroidManifest() {
@@ -95,11 +107,20 @@ public class QuickInfoModel implements Serializable {
         this.packageName = packageName;
     }
 
+    public int getTargetSdkVersion() {
+        return targetSdkVersion;
+    }
+
+    public void setTargetSdkVersion(int targetSdkVersion) {
+        this.targetSdkVersion = targetSdkVersion;
+    }
+
     @Override
     public String toString() {
         return "QuickInfoModel{" +
             "sdk='" + sdk + '\'' +
             ", apkpath='" + apkpath + '\'' +
+            ", signVersionPath='" + signVersionPath + '\'' +
             ", androidManifest=" + androidManifest +
             ", apktool=" + apktool +
             ", res=" + res +
@@ -107,6 +128,7 @@ public class QuickInfoModel implements Serializable {
             ", replaceIconType='" + replaceIconType + '\'' +
             ", replaceIconName='" + replaceIconName + '\'' +
             ", packageName='" + packageName + '\'' +
+            ", targetSdkVersion=" + targetSdkVersion +
             '}';
     }
 }

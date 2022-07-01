@@ -229,6 +229,18 @@ public class MergeDom4jUtil {
             for (QuickInfoModel quickInfoModel : QuickConfig.getInstance().getQuickModel().getQuick().getInfo()) {
                 String quickPath = quickInfoModel.getApkpath().replace(".apk", "") + "/AndroidManifest.xml";
                 List<Element> quickElements = getManifestElements(quickPath);
+
+                //删除渠道内的主入口
+                Iterator<Element> quickIterator = quickElements.iterator();
+                while (quickIterator.hasNext()){
+                    Element element = quickIterator.next();
+                    String elementName = element.attribute("name") != null ?
+                        element.attribute("name").getStringValue() : element.getName();
+                    if(elementName.contains("MainActivity")){
+                        quickIterator.remove();
+                    }
+                }
+
                 nodeMaps.put(quickInfoModel.getSdk(), quickElements);
             }
 
@@ -243,7 +255,6 @@ public class MergeDom4jUtil {
                 for (Element element : oneQuickList) {
                     String elementName = element.attribute("name") != null ?
                         element.attribute("name").getStringValue() : element.getName();
-                    System.out.println("渠道：" + next + " ； elementName: " + elementName);
 
                     Iterator<Element> tagIterator = tagElements.iterator();
                     while (tagIterator.hasNext()) {
@@ -251,7 +262,6 @@ public class MergeDom4jUtil {
                         String tagElementName = tagElement.attribute("name") != null ?
                             tagElement.attribute("name").getStringValue() : tagElement.getName();
                         if (elementName.equals(tagElementName)) {
-                            System.out.println("不同渠道：" + next + " ； 相同remove elementName: " + elementName);
                             tagIterator.remove();
                         }
                     }
@@ -292,26 +302,20 @@ public class MergeDom4jUtil {
                     Element element1;
                     if (element.getParent().getName().equals("queries")) {
                         try {
-                          //  element1 = tagNameElement.element("queries").addElement(element.getName());
                              element1 = tagNameElement.element("queries").addElement(element.getName());
-                          //  element1 = addChildElement(tagNameElement,"queries",element);
                             addChildElement(element,element1);
                         } catch (NullPointerException e) {
                             tagNameElement.addElement("queries");
-                            //    element1 = tagNameElement.element("queries").addElement(element.getName());
-                        //    element1 = addChildElement(tagNameElement,"queries",element);
                             element1 = tagNameElement.element("queries").addElement(element.getName());
                             addChildElement(element,element1);
                         }
                     } else if (element.getParent().getName().equals("application")) {
                         try {
-                       //     element1 = addChildElement(tagNameElement,"application",element);
                             element1 = tagNameElement.element("application").addElement(element.getName());
                             addChildElement(element,element1);
                         } catch (NullPointerException e) {
                             Element element1Element = tagNameElement.addElement("application");
                             element1Element.setAttributes(getDocument(outPath).getRootElement().element("application").attributes());
-                        //    element1 = addChildElement(tagNameElement,"application",element);
                             element1 = tagNameElement.element("application").addElement(element.getName());
                             addChildElement(element,element1);
                         }
