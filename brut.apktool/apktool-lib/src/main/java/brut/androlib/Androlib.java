@@ -296,7 +296,6 @@ public class Androlib {
 
         // 更新渠道配置信息
         QuickConfig.getInstance().updateQuickConfigInfo(appDir, meta, quick);
-
         buildOptions.isFramework = meta.isFrameworkApk;
         buildOptions.resourcesAreCompressed = meta.compressionType;
         buildOptions.doNotCompress = meta.doNotCompress;
@@ -351,9 +350,9 @@ public class Androlib {
             }
         }
         LOGGER.info("Built apk...");
-        if (QuickConfig.getInstance().isAutoBuildQuick()) {
+      /*  if (QuickConfig.getInstance().isAutoBuildQuick()) {
             signApk(outFile);
-        }
+        }*/
     }
 
     private void signApk(File outFile) {

@@ -1,5 +1,6 @@
 package config.utils;
 
+import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -7,17 +8,16 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 
+import brut.directory.ExtFile;
 import config.QuickConfig;
 import config.model.QuickInfoModel;
+import config.model.UpdateResModel;
 import org.dom4j.*;
 import org.dom4j.io.OutputFormat;
 import org.dom4j.io.SAXReader;
 import org.dom4j.io.XMLWriter;
-import org.w3c.dom.Node;
 
-import javax.xml.parsers.DocumentBuilder;
-
-public class MergeDom4jUtil {
+public class Dom4jUtil {
 
     /* 输出xml文档
      * @param doc 要输出的文档
@@ -61,11 +61,23 @@ public class MergeDom4jUtil {
                 elements.add(element);
                 elements.addAll(element.elements());
             }
-        }catch (Exception e){
+        } catch (Exception e) {
 
         }
 
         return elements;
+    }
+
+    public static String getOriginalPackageName(File appDir) {
+        File oldAndroidManifest = new File(appDir, "AndroidManifest.xml");
+        try {
+            Document document = getDocument(oldAndroidManifest.getPath());
+            Element rootElement = document.getRootElement();
+            return rootElement.attributeValue("package");
+        } catch (DocumentException e) {
+
+        }
+        return null;
     }
 
 
@@ -77,10 +89,9 @@ public class MergeDom4jUtil {
      * @param outPath
      * @param inPath
      */
-    public static void mergePublicXml(String outPath, String inPath) {
+    public static void mergePublicXml(String outPath, String inPath, List<String> filterName) {
         List<Element> list3 = new ArrayList<>();
         List<Element> merageList = new ArrayList<>();
-        List<String> filterName = new ArrayList<>();
         try {
             List<Element> list1 = getElements(outPath);
             List<Element> list2 = getElements(inPath);
@@ -99,12 +110,24 @@ public class MergeDom4jUtil {
                 }
 
                 if (!isFind) {
-                    String findName = element.attributeValue("name");
-                  //  if (!isContainName(findName)) {
+                    //    String findName = element.attributeValue("name");
+                    //   if(!resModel.contains(findName)){
+                    list3.add(element);
+                    //    }
+                   /* if (!isContainName(findName)) {
                         list3.add(element);
-                 //   }
+                    }*/
                 }
             }
+
+           /* Iterator<Element> iterator1 = merageList.iterator();
+            while (iterator1.hasNext()){
+                Element next = iterator1.next();
+                if(resModel.contains(next.attributeValue("name"))){
+                    iterator1.remove();
+                }
+            }*/
+
             //插入相同的type标签位置
             int index = 0;
             for (int i = 0; i < list1.size(); i++) {
@@ -153,15 +176,17 @@ public class MergeDom4jUtil {
         String tempId = "7f000000";
         String elementId = "0x7f000000";
         for (Element element : list) {
-/*             boolean isFilter = false;
-            String name = element.attribute("name").getStringValue();
-           for (String filter:filterName) {
-                if(name.equals(filter)){
+         //   boolean isFilter = false;
+            String name = element.attributeValue("name");
+            if(filterName.contains(name)){
+                continue;
+            }  /*          for (String filter : filterName) {
+                if (name.equals(filter)) {
                     isFilter = true;
                 }
-            }
+            }*/
 
-            if(isFilter){
+            /*if (isFilter) {
                 continue;
             }*/
 
@@ -206,6 +231,119 @@ public class MergeDom4jUtil {
         return false;
     }
 
+    public static void updateAndroidManifestXml(ExtFile appDir,String outPath) {
+
+        try {
+            String oldpackageName = null, newPackageName = null;
+            Document document = getDocument(outPath);
+            Element rootElement = document.getRootElement();
+            oldpackageName = rootElement.attributeValue("package");
+            System.out.println("旧包名：" + oldpackageName);
+            Element application = rootElement.element("application");
+
+            List<UpdateResModel> updateResIconModels = new ArrayList<>();
+
+            String icon = application.attributeValue("icon");
+            updateResIconModels.add(new UpdateResModel(icon.split("/")[0].split("@")[1],icon.split("/")[1]));
+
+            String roundIcon = application.attributeValue("roundIcon");
+            updateResIconModels.add(new UpdateResModel(roundIcon.split("/")[0].split("@")[1],roundIcon.split("/")[1]));
+
+            QuickInfoModel currentQuickInfo = QuickConfig.getInstance().getCurrentQuickInfo();
+            currentQuickInfo.setReplaceIcon(updateResIconModels);
+
+            List<UpdateResModel> currentManifest = currentQuickInfo.getAndroidManifest();
+
+            for (UpdateResModel updateInfo : currentManifest) {
+                if (updateInfo == null) {
+                    continue;
+                }
+                String type = updateInfo.getType();
+                String name = updateInfo.getName();
+                String value = updateInfo.getValue();
+                if (type.equals("manifest")) {
+                    if (rootElement.attribute(name) != null) {
+                        rootElement.attribute(name).setValue(value);
+                    }
+                } else if (type.equals("application")) {
+                    if (application.attribute(name) != null) {
+                        application.attribute(name).setValue(value);
+                    }
+                } else if (type.equals("meta-data")) {
+                    for (Element metaDataElement : rootElement.elements()) {
+                        if (metaDataElement.getName().equals("meta-data") && metaDataElement.attributeValue("name") != null
+                            && metaDataElement.attributeValue("name").equals(name)) {
+                            metaDataElement.attribute("value").setValue(value);
+                        }
+                    }
+
+                    for (Element metaDataElement : application.elements()) {
+                        if (metaDataElement.getName().equals("meta-data") && metaDataElement.attributeValue("name") != null
+                            && metaDataElement.attributeValue("name").equals(name)) {
+                            metaDataElement.attribute("value").setValue(value);
+                        }
+                    }
+                }
+            }
+
+            newPackageName = currentQuickInfo.getPackageName();
+
+            if (!TextUtils.isEmpty(newPackageName)) {
+                System.out.println("新包名: " + newPackageName);
+            } else {
+                System.out.println("未设置新包名沿用旧包");
+                newPackageName = QuickConfig.getInstance().getQuickModel().getOldPackageName();
+            }
+            System.out.println("设置包名");
+            rootElement.attribute("package").setValue(newPackageName);
+
+            for (Element element : rootElement.elements()) {
+                if (element.getName().equals("uses-permission") ||
+                    element.getName().equals("permission")
+                        && element.attributeValue("authorities") != null) {
+                    String authorities = element.attributeValue("name");
+                    if (authorities.contains(oldpackageName) && !TextUtils.isEmpty(newPackageName)) {
+                        element.attribute("name").setValue(authorities.replace(oldpackageName, newPackageName));
+                    }
+                }
+            }
+
+            for (Element element : application.elements()) {
+                if (element.getName().equals("provider") && element.attributeValue("authorities") != null) {
+                    String authorities = element.attributeValue("authorities");
+                    if (authorities.contains(oldpackageName) && !TextUtils.isEmpty(newPackageName)) {
+                        element.attribute("authorities").setValue(authorities.replace(oldpackageName, newPackageName));
+                    }
+                }
+            }
+
+            /**
+             * 判断application是否是渠道命名
+             */
+            System.out.println("修改application");
+            boolean isExists = false;
+            String applicationName = application.attributeValue("name");
+            for (QuickInfoModel infoModel:QuickConfig.getInstance().getQuickModel().getQuick().getInfo()){
+                if(applicationName.equals(infoModel.getApplication())){
+                    isExists = true;
+                }
+            }
+
+            if(isExists){
+                application.attribute("name").setValue(currentQuickInfo.getApplication());
+            }else {
+                FileUtils.resetExtendsApplication(appDir,applicationName);
+            }
+
+            writeXML(document, outPath);
+
+        } catch (Exception e) {
+            System.out.println("updateAndroidManifestXml 异常: " + e);
+        }
+
+    }
+
+
     /**
      * 合并配置清单
      *
@@ -223,20 +361,25 @@ public class MergeDom4jUtil {
 
             List<Element> tagElements = getManifestElements(outPath);
 
+            Element currentQuickRootElement = null;
+
             /**
              * 读取所有配置渠道清单信息
              */
             for (QuickInfoModel quickInfoModel : QuickConfig.getInstance().getQuickModel().getQuick().getInfo()) {
                 String quickPath = quickInfoModel.getApkpath().replace(".apk", "") + "/AndroidManifest.xml";
                 List<Element> quickElements = getManifestElements(quickPath);
+                if (quickInfoModel.getSdk().equals(quick)) {
+                    currentQuickRootElement = getDocument(quickPath).getRootElement();
+                }
 
                 //删除渠道内的主入口
                 Iterator<Element> quickIterator = quickElements.iterator();
-                while (quickIterator.hasNext()){
+                while (quickIterator.hasNext()) {
                     Element element = quickIterator.next();
                     String elementName = element.attribute("name") != null ?
                         element.attribute("name").getStringValue() : element.getName();
-                    if(elementName.contains("MainActivity")){
+                    if (elementName.contains("MainActivity")) {
                         quickIterator.remove();
                     }
                 }
@@ -271,7 +414,7 @@ public class MergeDom4jUtil {
             outElements.addAll(tagElements);
             outElements.addAll(nodeMaps.get(quick));
 
-            Document manifestDocument = createManifestDocument(outPath, outElements, removeName);
+            Document manifestDocument = createManifestDocument(outPath, outElements, removeName, currentQuickRootElement);
             writeXML(manifestDocument, outPath);
         } catch (
             Exception e) {
@@ -280,12 +423,15 @@ public class MergeDom4jUtil {
 
     }
 
-    private static Document createManifestDocument(String outPath, List<Element> outElement, List<String> removeName) {
+    private static Document createManifestDocument(String outPath, List<Element> outElement,
+                                                   List<String> removeName, Element currentQuickElement) {
         Document document = DocumentHelper.createDocument();
         Element tagNameElement = document.addElement("manifest");
 
         try {
-            List<Attribute> attributes = getDocument(outPath).getRootElement().attributes();
+            Element rootElement = getDocument(outPath).getRootElement();
+            String outPackageName = rootElement.attribute("package").getStringValue();
+            List<Attribute> attributes = rootElement.attributes();
             tagNameElement.setAttributes(attributes);
 
             for (Element element : outElement) {
@@ -302,71 +448,89 @@ public class MergeDom4jUtil {
                     Element element1;
                     if (element.getParent().getName().equals("queries")) {
                         try {
-                             element1 = tagNameElement.element("queries").addElement(element.getName());
-                            addChildElement(element,element1);
+                            element1 = tagNameElement.element("queries").addElement(element.getName());
+                            addChildElement(element, element1);
                         } catch (NullPointerException e) {
                             tagNameElement.addElement("queries");
                             element1 = tagNameElement.element("queries").addElement(element.getName());
-                            addChildElement(element,element1);
+                            addChildElement(element, element1);
                         }
                     } else if (element.getParent().getName().equals("application")) {
                         try {
                             element1 = tagNameElement.element("application").addElement(element.getName());
-                            addChildElement(element,element1);
+                            addChildElement(element, element1);
                         } catch (NullPointerException e) {
                             Element element1Element = tagNameElement.addElement("application");
-                            element1Element.setAttributes(getDocument(outPath).getRootElement().element("application").attributes());
+                            Element application = getDocument(outPath).getRootElement().element("application");
+                            element1Element.setAttributes(currentQuickElement.element("application").attributes());
+
+                            if (element1Element.attributeValue("name") != null &&
+                                application.attributeValue("name") != null) {
+                                element1Element.attribute("name").setValue(application.attributeValue("name"));
+                            }
+
+                            if (element1Element.attributeValue("label") != null &&
+                                application.attributeValue("label") != null) {
+                                element1Element.attribute("label").setValue(application.attributeValue("label"));
+                            }
+
+                            if (element1Element.attributeValue("icon") != null &&
+                                application.attributeValue("icon") != null) {
+                                element1Element.attribute("icon").setValue(application.attributeValue("icon"));
+                            }
+
                             element1 = tagNameElement.element("application").addElement(element.getName());
-                            addChildElement(element,element1);
+                            addChildElement(element, element1);
                         }
-                    }else {
+                    } else {
                         if (element.getName().equals("queries") || element.getName().equals("application")) {
                             continue;
                         }
                         element1 = tagNameElement.addElement(element.getName());
                     }
+
                     element1.setAttributes(element.attributes());
+                    if (element1.getName().equals("provider") && element1.attributeValue("authorities") != null) {
+                        element1.attribute("authorities").setValue(element1.attributeValue("authorities")
+                            .replace(currentQuickElement.attribute("package").getStringValue(), outPackageName));
+                    } else if (element1.getName().equals("uses-permission") ||
+                        element1.getName().equals("permission")
+                            && element1.attributeValue("name") != null) {
+                        element1.attribute("name").setValue(element1.attributeValue("name")
+                            .replace(currentQuickElement.attribute("package").getStringValue(), outPackageName));
+                    }
                 }
             }
 
         } catch (Exception e) {
-
+            System.out.println("createManifestDocument 异常: " + e);
         }
 
         return document;
     }
 
-    public static Element addChildElement(Element inElement,Element outElement){
-
-        if(inElement.elements().size()>0){
-            for (Element element:inElement.elements()) {
+    public static Element addChildElement(Element inElement, Element outElement) {
+        if (inElement.elements().size() > 0) {
+            for (Element element : inElement.elements()) {
                 Element element2 = outElement.addElement(element.getName());
                 element2.setAttributes(element.attributes());
-                addChildElement(element,element2);
+                addChildElement(element, element2);
             }
         }
         return outElement;
     }
 
-
-
-/*    public static Element addChildElement(Element tagElement ,String name,Element element){
-        Element element1 = tagElement.element(name).addElement(element.getName());
-        if(element.elements().size()>0){
-            for (Element element2:element.elements()) {
-                Element element3 = element1.addElement(element2.getName());
-                element3.setAttributes(element2.attributes());
-                if(element2.elements().size()>0){
-                    for (Element element4:element2.elements()) {
-                        Element element5 = element3.addElement(element4.getName());
-                        element5.setAttributes(element4.attributes());
-                    }
-                }
-
+    public static HashMap<String, String> getAllPublic(File file) {
+        HashMap<String, String> publicMap = new HashMap<>();
+        try {
+            List<Element> elements = getDocument(file.getPath()).getRootElement().elements();
+            for (Element element : elements) {
+                publicMap.put(element.attributeValue("name"), element.attributeValue("id"));
             }
-        }
-        return element1;
-    }*/
+        } catch (Exception e) {
 
+        }
+        return publicMap;
+    }
 
 }

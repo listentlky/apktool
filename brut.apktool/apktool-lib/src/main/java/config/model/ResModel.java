@@ -5,23 +5,23 @@ import java.util.List;
 
 public class ResModel implements Serializable {
 
-    private List<String> icon;
+    private List<UpdateResModel> icon;
 
-    private List<String> value;
+    private List<UpdateResModel> value;
 
-    public List<String> getIcon() {
+    public List<UpdateResModel> getIcon() {
         return icon;
     }
 
-    public void setIcon(List<String> icon) {
+    public void setIcon(List<UpdateResModel> icon) {
         this.icon = icon;
     }
 
-    public List<String> getValue() {
+    public List<UpdateResModel> getValue() {
         return value;
     }
 
-    public void setValue(List<String> value) {
+    public void setValue(List<UpdateResModel> value) {
         this.value = value;
     }
 

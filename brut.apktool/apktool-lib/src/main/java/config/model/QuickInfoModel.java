@@ -11,7 +11,11 @@ public class QuickInfoModel implements Serializable {
 
     private String signVersionPath;
 
-    private List<String> androidManifest;
+    private String packageName;
+
+    private String application;
+
+    private List<UpdateResModel> androidManifest;
 
     private ApktoolModel apktool;
 
@@ -19,11 +23,7 @@ public class QuickInfoModel implements Serializable {
 
     private KeyStoreModel keystore;
 
-    private String replaceIconType;
-
-    private String replaceIconName;
-
-    private String packageName;
+    private List<UpdateResModel> replaceIcon;
 
     private int targetSdkVersion;
 
@@ -51,11 +51,27 @@ public class QuickInfoModel implements Serializable {
         this.signVersionPath = signVersionPath;
     }
 
-    public List<String> getAndroidManifest() {
+    public String getPackageName() {
+        return packageName;
+    }
+
+    public void setPackageName(String packageName) {
+        this.packageName = packageName;
+    }
+
+    public String getApplication() {
+        return application;
+    }
+
+    public void setApplication(String application) {
+        this.application = application;
+    }
+
+    public List<UpdateResModel> getAndroidManifest() {
         return androidManifest;
     }
 
-    public void setAndroidManifest(List<String> androidManifest) {
+    public void setAndroidManifest(List<UpdateResModel> androidManifest) {
         this.androidManifest = androidManifest;
     }
 
@@ -83,28 +99,12 @@ public class QuickInfoModel implements Serializable {
         this.keystore = keystore;
     }
 
-    public String getReplaceIconType() {
-        return replaceIconType;
+    public List<UpdateResModel> getReplaceIcon() {
+        return replaceIcon;
     }
 
-    public void setReplaceIconType(String replaceIconType) {
-        this.replaceIconType = replaceIconType;
-    }
-
-    public String getReplaceIconName() {
-        return replaceIconName;
-    }
-
-    public void setReplaceIconName(String replaceIconName) {
-        this.replaceIconName = replaceIconName;
-    }
-
-    public String getPackageName() {
-        return packageName;
-    }
-
-    public void setPackageName(String packageName) {
-        this.packageName = packageName;
+    public void setReplaceIcon(List<UpdateResModel> replaceIcon) {
+        this.replaceIcon = replaceIcon;
     }
 
     public int getTargetSdkVersion() {
@@ -121,13 +121,13 @@ public class QuickInfoModel implements Serializable {
             "sdk='" + sdk + '\'' +
             ", apkpath='" + apkpath + '\'' +
             ", signVersionPath='" + signVersionPath + '\'' +
+            ", packageName='" + packageName + '\'' +
+            ", application='" + application + '\'' +
             ", androidManifest=" + androidManifest +
             ", apktool=" + apktool +
             ", res=" + res +
             ", keystore=" + keystore +
-            ", replaceIconType='" + replaceIconType + '\'' +
-            ", replaceIconName='" + replaceIconName + '\'' +
-            ", packageName='" + packageName + '\'' +
+            ", replaceIcon=" + replaceIcon +
             ", targetSdkVersion=" + targetSdkVersion +
             '}';
     }

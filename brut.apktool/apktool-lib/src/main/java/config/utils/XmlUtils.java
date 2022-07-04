@@ -1,7 +1,7 @@
 package config.utils;
 
 import config.QuickConfig;
-import config.model.QuickInfoModel;
+import config.model.UpdateResModel;
 import org.w3c.dom.*;
 import org.xml.sax.SAXException;
 
@@ -342,7 +342,7 @@ public class XmlUtils {
      * @param outXmlFileName
      * @param inXmlFileName
      */
-    public static void mergingXml(String outXmlFileName, String inXmlFileName) {
+    public static void mergingXml(String outXmlFileName, String inXmlFileName,List<String> filterName) {
 
         try {
             DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
@@ -394,6 +394,18 @@ public class XmlUtils {
                             if (inNodeName.getNodeValue().equals(rootNodeName.getNodeValue())) {
                                 isAdd = false;
                                 Node importedNode = doc1.importNode(replaceItem, true);
+
+                                /*if(rootItem.hasChildNodes()){
+                                    for (int j = 1; j < rootItem.getChildNodes().getLength(); j += 2) {
+                                        Node item = rootItem.getChildNodes().item(j);
+                                        if(item.getTextContent() != null &&
+                                            item.getTextContent().contains("@layout/")){
+                                            if(filterName.contains(item.getTextContent().replace("@layout/",""))){
+                                                item.setTextContent("");
+                                            }
+                                        }
+                                    }
+                                }*/
                                 rootElement1.replaceChild(importedNode, rootItem);
                             }
                         }
@@ -410,16 +422,18 @@ public class XmlUtils {
             /**
              * 修改指定 strings value 值
              */
-            for (String replaceString : QuickConfig.getInstance().getCurrentQuickInfo().getRes().getValue()) {
-                String[] replaceStringSplit = replaceString.split("=");
+            for (UpdateResModel replaceString : QuickConfig.getInstance().getCurrentQuickInfo().getRes().getValue()) {
+                String type = replaceString.getType();
+                String name = replaceString.getName();
+                String value = replaceString.getValue();
 
-                if (outXmlFileName.contains(replaceStringSplit[0]) && outXmlFileName.endsWith("strings.xml")) {
+                if (outXmlFileName.contains(type) && outXmlFileName.endsWith("strings.xml")) {
 
                     for (int k = 1; k < rootElement1.getChildNodes().getLength(); k += 2) {
 
                         Node item = rootElement1.getChildNodes().item(k);
-                        if (item.getAttributes().getNamedItem("name").getNodeValue().equals(replaceStringSplit[1])) {
-                            item.setTextContent(replaceStringSplit[2]);
+                        if (item.getAttributes().getNamedItem("name").getNodeValue().equals(name)) {
+                            item.setTextContent(value);
                         }
                     }
                 }
@@ -505,7 +519,7 @@ public class XmlUtils {
 
             File file = new File("E:\\devcopy\\cwqmx_tg_20220507\\res");
 
-               MergeDom4jUtil.mergeAndroidManifestXml(sourcefile,"xipu");
+               Dom4jUtil.mergeAndroidManifestXml(sourcefile,"xipu");
 
        //     mergingManifestXml(sourcefile, "xipu");
 

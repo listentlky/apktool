@@ -29,6 +29,7 @@ import config.QuickConfig;
 import config.model.DecodeApkFileModel;
 import config.model.QuickInfoModel;
 import config.res.ResManager;
+import config.utils.Dom4jUtil;
 import config.utils.TextUtils;
 import org.apache.commons.cli.*;
 
@@ -232,7 +233,9 @@ public class Main {
                 if(i == apkFileList.size()-1){
                     if (QuickConfig.getInstance().getQuickModel() != null
                         && QuickConfig.getInstance().getQuickModel().getQuick() != null) {
-
+                        QuickConfig.getInstance().getQuickModel().setOldPackageName(Dom4jUtil.getOriginalPackageName(outDir));
+                        File publicXml = new File(outDir, "res\\values\\public.xml");
+                        QuickConfig.getInstance().getQuickModel().setOriginalPublic(Dom4jUtil.getAllPublic(publicXml));
                         for (String quick : QuickConfig.getInstance().getQuickModel().getQuick().getOut()) {
                             System.out.println("当前渠道: "+quick);
 

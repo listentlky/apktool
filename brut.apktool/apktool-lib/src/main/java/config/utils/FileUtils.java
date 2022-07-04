@@ -1,8 +1,13 @@
 package config.utils;
 
+import config.QuickConfig;
+import config.model.QuickInfoModel;
+
 import java.io.*;
 import java.nio.channels.FileChannel;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 
 public class FileUtils {
@@ -74,6 +79,16 @@ public class FileUtils {
         }
     }
 
+    public static void deleteAllFile(File file){
+        for (File file1:file.listFiles()) {
+            if(file1.isDirectory()){
+                deleteAllFile(file1);
+            }else {
+                file1.delete();
+            }
+        }
+    }
+
 
     public static void copyFile(File in,File out){
         FileChannel inputChannel = null;
@@ -94,6 +109,117 @@ public class FileUtils {
 
         }
 
+    }
+
+    public static void resetRFile(File file, HashMap<String, String> allPublic){
+        BufferedReader bufferedReader = null;
+        BufferedWriter bufferedWriter = null;
+        try {
+            bufferedReader = new BufferedReader(new InputStreamReader(new FileInputStream(file),"UTF-8"));
+            String str = "";
+            String line = "";
+            while ((line = bufferedReader.readLine()) != null){
+                Iterator<String> iterator = allPublic.keySet().iterator();
+                while (iterator.hasNext()){
+                    String next = iterator.next();
+                    if(line.contains(next) && line.contains("=")){
+                        line = line.split("=")[0]+" = "+allPublic.get(next);
+                    }
+                }
+                line+="\n";
+                str+=line;
+            }
+            bufferedWriter = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(file),"UTF-8"));
+            bufferedWriter.write(str);
+
+        }catch (Exception e){
+
+        }finally {
+           try {
+               bufferedReader.close();
+               bufferedWriter.close();
+           }catch (Exception e){
+
+           }
+        }
+    }
+
+    public static void resetRSmaliFile(File file, HashMap<String, String> allPublic){
+        BufferedReader bufferedReader = null;
+        BufferedWriter bufferedWriter = null;
+        try {
+            bufferedReader = new BufferedReader(new InputStreamReader(new FileInputStream(file),"UTF-8"));
+            String str = "";
+            String line = "";
+            while ((line = bufferedReader.readLine()) != null){
+                if(line.contains("0x7f")) {
+                    Iterator<String> oldIterator = QuickConfig.getInstance().getQuickModel().getOriginalPublic().keySet().iterator();
+                    while (oldIterator.hasNext()) {
+                        String next = oldIterator.next();
+                        String ID = QuickConfig.getInstance().getQuickModel().getOriginalPublic().get(next);
+                        if (line.contains(ID)) {
+                            Iterator<String> resetIterator = allPublic.keySet().iterator();
+                            while (resetIterator.hasNext()) {
+                                String next2 = resetIterator.next();
+                                if (next.equals(next2)) {
+                                    line = line.replace(ID, allPublic.get(next2));
+                                }
+                            }
+                        }
+                    }
+                }
+                line+="\n";
+                str+=line;
+            }
+            bufferedWriter = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(file),"UTF-8"));
+            bufferedWriter.write(str);
+
+        }catch (Exception e){
+
+        }finally {
+            try {
+                bufferedReader.close();
+                bufferedWriter.close();
+            }catch (Exception e){
+
+            }
+        }
+    }
+
+    public static void resetExtendsApplication(File file,String application){
+        String applicationPath = application.replaceAll("\\.","/");
+        File applicationSmaliFile = new File(file,"smali\\"+applicationPath+".smali");
+        BufferedReader bufferedReader = null;
+        BufferedWriter bufferedWriter = null;
+        try {
+            bufferedReader = new BufferedReader(new InputStreamReader(new FileInputStream(applicationSmaliFile),"UTF-8"));
+            String str = "";
+            String line = "";
+
+            while ((line = bufferedReader.readLine()) != null){
+
+                for (QuickInfoModel infoModel:QuickConfig.getInstance().getQuickModel().getQuick().getInfo()){
+                    String quickApplication = infoModel.getApplication().replaceAll("\\.","/");
+                    if(line.contains(quickApplication)){
+                        String currentQuickApplication = QuickConfig.getInstance().getCurrentQuickInfo().getApplication().replaceAll("\\.", "/");
+                        line = line.replace(quickApplication,currentQuickApplication);
+                    }
+                }
+                line+="\n";
+                str+=line;
+            }
+            bufferedWriter = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(applicationSmaliFile),"UTF-8"));
+            bufferedWriter.write(str);
+
+        }catch (Exception e){
+        }finally {
+            try {
+                bufferedReader.close();
+                bufferedWriter.close();
+            }catch (Exception e){
+
+            }
+        }
     }
 
 }

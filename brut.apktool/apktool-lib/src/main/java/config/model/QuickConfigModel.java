@@ -1,11 +1,17 @@
 package config.model;
 
 import java.io.Serializable;
+import java.util.HashMap;
 import java.util.List;
 
 public class QuickConfigModel implements Serializable {
 
     private QuickModel quick;
+
+    private String oldPackageName;
+
+    private HashMap<String, String> originalPublic;
+
 
     public QuickModel getQuick() {
         return quick;
@@ -15,10 +21,28 @@ public class QuickConfigModel implements Serializable {
         this.quick = quick;
     }
 
+    public String getOldPackageName() {
+        return oldPackageName;
+    }
+
+    public void setOldPackageName(String oldPackageName) {
+        this.oldPackageName = oldPackageName;
+    }
+
+    public HashMap<String, String> getOriginalPublic() {
+        return originalPublic;
+    }
+
+    public void setOriginalPublic(HashMap<String, String> originalPublic) {
+        this.originalPublic = originalPublic;
+    }
+
     @Override
     public String toString() {
         return "QuickConfigModel{" +
             "quick=" + quick +
+            ", oldPackageName='" + oldPackageName + '\'' +
+            ", originalPublic=" + originalPublic +
             '}';
     }
 
