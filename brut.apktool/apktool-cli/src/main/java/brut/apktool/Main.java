@@ -28,15 +28,12 @@ import brut.util.OSDetection;
 import config.QuickConfig;
 import config.model.DecodeApkFileModel;
 import config.model.QuickInfoModel;
-import config.res.ResManager;
 import config.utils.Dom4jUtil;
 import config.utils.TextUtils;
 import org.apache.commons.cli.*;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.HashMap;
-import java.util.Iterator;
 import java.util.List;
 import java.util.logging.*;
 

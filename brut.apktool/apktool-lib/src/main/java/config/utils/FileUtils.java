@@ -119,11 +119,14 @@ public class FileUtils {
             String str = "";
             String line = "";
             while ((line = bufferedReader.readLine()) != null){
-                Iterator<String> iterator = allPublic.keySet().iterator();
-                while (iterator.hasNext()){
-                    String next = iterator.next();
-                    if(line.contains(next) && line.contains("=")){
-                        line = line.split("=")[0]+" = "+allPublic.get(next);
+                if(line.contains(":") && line.contains("=")){
+                    String name = line.split("final")[1].split(":")[0].replaceAll(" ","");
+                    Iterator<String> iterator = allPublic.keySet().iterator();
+                    while (iterator.hasNext()){
+                        String next = iterator.next();
+                        if(name.equals((next))){
+                            line = line.split("=")[0]+" = "+allPublic.get(next);
+                        }
                     }
                 }
                 line+="\n";
@@ -216,6 +219,30 @@ public class FileUtils {
             try {
                 bufferedReader.close();
                 bufferedWriter.close();
+            }catch (Exception e){
+
+            }
+        }
+    }
+
+
+    public static void searchID(File file){
+        BufferedReader bufferedReader = null;
+        try {
+            bufferedReader = new BufferedReader(new InputStreamReader(new FileInputStream(file),"UTF-8"));
+            String str = "";
+            String line = "";
+            while ((line = bufferedReader.readLine()) != null){
+                if(line.contains("ScrollTextLayout")){
+                    System.out.println("ScrollTextLayout: "+file.getPath());
+                }
+            }
+
+        }catch (Exception e){
+
+        }finally {
+            try {
+                bufferedReader.close();
             }catch (Exception e){
 
             }

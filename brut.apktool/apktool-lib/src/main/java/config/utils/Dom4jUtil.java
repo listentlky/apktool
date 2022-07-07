@@ -120,14 +120,6 @@ public class Dom4jUtil {
                 }
             }
 
-           /* Iterator<Element> iterator1 = merageList.iterator();
-            while (iterator1.hasNext()){
-                Element next = iterator1.next();
-                if(resModel.contains(next.attributeValue("name"))){
-                    iterator1.remove();
-                }
-            }*/
-
             //插入相同的type标签位置
             int index = 0;
             for (int i = 0; i < list1.size(); i++) {
@@ -243,11 +235,15 @@ public class Dom4jUtil {
 
             List<UpdateResModel> updateResIconModels = new ArrayList<>();
 
-            String icon = application.attributeValue("icon");
-            updateResIconModels.add(new UpdateResModel(icon.split("/")[0].split("@")[1],icon.split("/")[1]));
+            if(application.attribute("icon") != null) {
+                String icon = application.attributeValue("icon");
+                updateResIconModels.add(new UpdateResModel(icon.split("/")[0].split("@")[1], icon.split("/")[1]));
+            }
 
-            String roundIcon = application.attributeValue("roundIcon");
-            updateResIconModels.add(new UpdateResModel(roundIcon.split("/")[0].split("@")[1],roundIcon.split("/")[1]));
+            if(application.attribute("roundIcon") != null) {
+                String roundIcon = application.attributeValue("roundIcon");
+                updateResIconModels.add(new UpdateResModel(roundIcon.split("/")[0].split("@")[1], roundIcon.split("/")[1]));
+            }
 
             QuickInfoModel currentQuickInfo = QuickConfig.getInstance().getCurrentQuickInfo();
             currentQuickInfo.setReplaceIcon(updateResIconModels);
